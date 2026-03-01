@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import type { AdminDbStats, AdminTabType } from "@/lib/admin/types"
 import { adminApi, getErrorMessage, isReauthError } from "@/lib/api/admin-client"
-import { logoutClientSession } from "@/lib/auth/client-session"
+import { logoutClientSession, readClientSession } from "@/lib/auth/client-session"
 
 interface UseAdminDbStatsOptions {
   enabled: boolean
@@ -42,6 +42,30 @@ export function useAdminDbStats({
     [onError],
   )
 
+  const ensureAdminSession = useCallback(
+    async (silent = false) => {
+      const session = await readClientSession({ force: false, status: "checking" })
+      if (!session.user || session.status !== "authenticated") {
+        if (!silent) {
+          onError("Sessao expirada. Faca login novamente.")
+        }
+        await logoutClientSession()
+        return false
+      }
+
+      if (session.user.role !== "admin") {
+        if (!silent) {
+          onError("Acesso restrito ao administrador.")
+        }
+        await logoutClientSession()
+        return false
+      }
+
+      return true
+    },
+    [onError],
+  )
+
   const loadDbStats = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!enabled) {
@@ -49,6 +73,11 @@ export function useAdminDbStats({
       }
 
       const silent = options?.silent ?? false
+      const sessionOk = await ensureAdminSession(silent)
+      if (!sessionOk) {
+        return
+      }
+
       setLoadingDb(true)
       try {
         const response = await adminApi.get<AdminDbStats>("/api/db/stats")
@@ -59,7 +88,7 @@ export function useAdminDbStats({
         setLoadingDb(false)
       }
     },
-    [enabled, handleError],
+    [enabled, ensureAdminSession, handleError],
   )
 
   useEffect(() => {
@@ -77,6 +106,11 @@ export function useAdminDbStats({
         : `Tem certeza que deseja limpar todos os dados de ${table}? Esta acao nao pode ser desfeita.`
 
       if (!confirm(confirmMsg)) {
+        return
+      }
+
+      const sessionOk = await ensureAdminSession(false)
+      if (!sessionOk) {
         return
       }
 
@@ -98,7 +132,7 @@ export function useAdminDbStats({
         setClearingData(false)
       }
     },
-    [handleError, loadDbStats, onAfterClear, onSuccess],
+    [ensureAdminSession, handleError, loadDbStats, onAfterClear, onSuccess],
   )
 
   return {

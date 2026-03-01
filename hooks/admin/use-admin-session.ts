@@ -25,19 +25,22 @@ export function useAdminSession({ onError }: UseAdminSessionOptions) {
     setLoadingSession(true)
 
     try {
-      const cachedSession = await readClientSession({ force: false, status: "checking" })
+      const cachedSession = await readClientSession({ force: true, status: "checking" })
       if (cachedSession.status === "unauthenticated" || !cachedSession.user) {
+        setCurrentUser(null)
         router.replace("/login")
         return null
       }
 
       const response = await adminApi.get<{ user: AdminCurrentUser | null; sessionStatus?: string }>("/api/auth/me")
       if (!response.user || response.sessionStatus === "unauthenticated") {
+        setCurrentUser(null)
         router.replace("/login")
         return null
       }
 
       if (response.user.role !== "admin") {
+        setCurrentUser(null)
         router.replace("/")
         return null
       }
@@ -45,6 +48,7 @@ export function useAdminSession({ onError }: UseAdminSessionOptions) {
       setCurrentUser(response.user)
       return response.user
     } catch (error) {
+      setCurrentUser(null)
       if (isReauthError(error)) {
         onError("Sessao expirada. Faca login novamente.")
       } else {

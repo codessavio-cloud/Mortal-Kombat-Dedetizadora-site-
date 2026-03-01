@@ -497,7 +497,8 @@ export async function proxy(request: NextRequest) {
     return secureResponse(NextResponse.redirect(buildLoginRedirectUrl(request)), requestId, rateLimitRemaining)
   }
 
-  if (pathname === "/admin" && payload.role !== "admin") {
+  const isAdminPageRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  if (isAdminPageRoute && payload.role !== "admin") {
     return secureResponse(NextResponse.redirect(new URL("/", request.url)), requestId, rateLimitRemaining)
   }
 
@@ -519,6 +520,7 @@ export const config = {
     "/rato",
     "/lei",
     "/admin",
+    "/admin/:path*",
     "/caixa-dagua",
     "/veiculos",
     "/atomizacao",

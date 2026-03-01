@@ -22,7 +22,7 @@ import type {
   MonitoringStatus,
 } from "@/lib/admin/types"
 import { adminApi, getErrorMessage, isReauthError } from "@/lib/api/admin-client"
-import { logoutClientSession } from "@/lib/auth/client-session"
+import { logoutClientSession, readClientSession } from "@/lib/auth/client-session"
 
 interface UseAdminActivityOptions {
   enabled: boolean
@@ -95,6 +95,30 @@ export function useAdminActivity({ enabled, activeTab, users, onError, onSuccess
     [onError],
   )
 
+  const ensureAdminSession = useCallback(
+    async (silent = false) => {
+      const session = await readClientSession({ force: false, status: "checking" })
+      if (!session.user || session.status !== "authenticated") {
+        if (!silent) {
+          onError("Sessao expirada. Faca login novamente.")
+        }
+        await logoutClientSession()
+        return false
+      }
+
+      if (session.user.role !== "admin") {
+        if (!silent) {
+          onError("Acesso restrito ao administrador.")
+        }
+        await logoutClientSession()
+        return false
+      }
+
+      return true
+    },
+    [onError],
+  )
+
   const loadOverview = useCallback(
     async (options?: { includeStats?: boolean; silent?: boolean }) => {
       if (!enabled) {
@@ -103,6 +127,12 @@ export function useAdminActivity({ enabled, activeTab, users, onError, onSuccess
 
       const includeStats = options?.includeStats ?? true
       const silent = options?.silent ?? false
+
+      const sessionOk = await ensureAdminSession(silent)
+      if (!sessionOk) {
+        return
+      }
+
       setLoadingOverview(true)
       try {
         const query = new URLSearchParams({
@@ -122,7 +152,7 @@ export function useAdminActivity({ enabled, activeTab, users, onError, onSuccess
         setLoadingOverview(false)
       }
     },
-    [enabled, handleError],
+    [enabled, ensureAdminSession, handleError],
   )
 
   const loadActivityPage = useCallback(
@@ -134,6 +164,12 @@ export function useAdminActivity({ enabled, activeTab, users, onError, onSuccess
       const cursor = options?.cursor ?? currentCursor
       const includeStats = options?.includeStats ?? false
       const silent = options?.silent ?? false
+
+      const sessionOk = await ensureAdminSession(silent)
+      if (!sessionOk) {
+        return
+      }
+
       setLoadingActivities(true)
 
       try {
@@ -175,6 +211,7 @@ export function useAdminActivity({ enabled, activeTab, users, onError, onSuccess
       filterActivityType,
       filterUser,
       handleError,
+      ensureAdminSession,
     ],
   )
 
