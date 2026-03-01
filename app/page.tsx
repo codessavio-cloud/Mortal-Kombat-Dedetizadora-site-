@@ -5,6 +5,7 @@ import { cookies } from "next/headers"
 import { verifyAuthToken, type AuthTokenPayload } from "@/lib/auth/jwt"
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants"
 import { Droplets, Car, TreePalm, MessageCircle } from "lucide-react"
+import { SignOutButton } from "@/components/auth/signout-button"
 
 async function getCurrentUser() {
   const cookieStore = await cookies()
@@ -70,14 +71,9 @@ export default async function HomePage() {
                     </Link>
                   )}
 
-                  <form action="/api/auth/logout" method="POST">
-                    <button
-                      type="submit"
-                      className="bg-gray-200 text-gray-700 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold hover:bg-gray-300 transition-all text-xs sm:text-sm"
-                    >
-                      Sair
-                    </button>
-                  </form>
+                  <SignOutButton
+                    className="bg-gray-200 text-gray-700 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-xs sm:text-sm"
+                  />
                 </div>
               )}
             </div>

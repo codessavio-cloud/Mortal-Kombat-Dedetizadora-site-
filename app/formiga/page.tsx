@@ -15,6 +15,7 @@ import {
   getFormigaCondominioMaxFloors,
   getFormigaCondominioPricing,
 } from "@/lib/calculators/formiga"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function FormigaPage() {
   const [copied, setCopied] = useState(false)
@@ -25,7 +26,6 @@ export default function FormigaPage() {
   const [resultadoCartao, setResultadoCartao] = useState<number | null>(null)
   const [resultadoVista, setResultadoVista] = useState<number | null>(null)
   const [erro, setErro] = useState("")
-
   const calcularFuncionariosEHoras = () => {
     if (!numBlocos || !numAndares) return { funcionarios: 0, horas: 0 }
 
@@ -319,14 +319,14 @@ Afastamento: 4–6 horas (24h para gestantes, alérgicos e animais).`
                         <CreditCard className="w-3 h-3 md:w-4 md:h-4 text-blue-600" />
                         <p className="text-[10px] md:text-xs text-gray-700 font-semibold">Cartão</p>
                       </div>
-                      <p className="text-lg md:text-2xl font-bold text-blue-700">R$ {resultadoCartao.toFixed(2)}</p>
+                      <p className="text-lg md:text-2xl font-bold text-blue-700">{formatBRL(resultadoCartao)}</p>
                     </div>
                     <div className="bg-green-50 border-2 border-green-400 rounded-xl p-3 md:p-4 text-center">
                       <div className="flex items-center justify-center gap-1 md:gap-1.5 mb-1 md:mb-1.5">
                         <Banknote className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
                         <p className="text-[10px] md:text-xs text-gray-700 font-semibold">À Vista</p>
                       </div>
-                      <p className="text-lg md:text-2xl font-bold text-green-700">R$ {resultadoVista.toFixed(2)}</p>
+                      <p className="text-lg md:text-2xl font-bold text-green-700">{formatBRL(resultadoVista)}</p>
                     </div>
                   </div>
                 )}

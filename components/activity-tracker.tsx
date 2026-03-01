@@ -2,64 +2,63 @@
 
 import { useEffect, useCallback, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
+import {
+  readClientSession,
+  subscribeAuthEvents,
+} from "@/lib/auth/client-session"
 
-const AUTH_STATUS_TTL_MS = 60_000
 const ACTIVITY_DEDUP_WINDOW_MS = 4_000
+
+interface TrackerEventDetail {
+  details?: string
+}
 
 export function ActivityTracker() {
   const pathname = usePathname()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const authCheckedAtRef = useRef(0)
-  const authRequestControllerRef = useRef<AbortController | null>(null)
   const lastActivityRef = useRef<{ key: string; timestamp: number } | null>(null)
 
   useEffect(() => {
     if (pathname === "/login") {
       setIsAuthenticated(false)
-      authCheckedAtRef.current = 0
-      authRequestControllerRef.current?.abort()
-      authRequestControllerRef.current = null
       return
     }
 
-    const now = Date.now()
-    if (now - authCheckedAtRef.current < AUTH_STATUS_TTL_MS) {
-      return
-    }
+    let cancelled = false
 
     const checkAuth = async () => {
-      authRequestControllerRef.current?.abort()
-      const controller = new AbortController()
-      authRequestControllerRef.current = controller
-
       try {
-        const res = await fetch("/api/auth/me", {
-          cache: "no-store",
-          signal: controller.signal,
-        })
-        setIsAuthenticated(res.ok)
-        authCheckedAtRef.current = Date.now()
+        const snapshot = await readClientSession({ force: false })
+        if (!cancelled) {
+          setIsAuthenticated(snapshot.status === "authenticated")
+        }
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (cancelled) {
           return
         }
         setIsAuthenticated(false)
-        authCheckedAtRef.current = Date.now()
         if (process.env.NODE_ENV !== "production") {
           console.warn("[activity-tracker] Falha ao validar autenticacao", error)
-        }
-      } finally {
-        if (authRequestControllerRef.current === controller) {
-          authRequestControllerRef.current = null
         }
       }
     }
 
     void checkAuth()
 
+    const unsubscribe = subscribeAuthEvents((event) => {
+      if (event.type === "logout") {
+        setIsAuthenticated(false)
+        return
+      }
+
+      if (event.type === "login" || event.type === "refresh") {
+        void checkAuth()
+      }
+    })
+
     return () => {
-      authRequestControllerRef.current?.abort()
-      authRequestControllerRef.current = null
+      cancelled = true
+      unsubscribe()
     }
   }, [pathname])
 
@@ -122,20 +121,28 @@ export function ActivityTracker() {
   useEffect(() => {
     if (!isAuthenticated || pathname === "/login") return
 
-    const handleCalculo = (e: CustomEvent) => {
-      logActivity("Calculou orcamento", e.detail?.details || "", "calculo")
+    const handleCalculo = (event: Event) => {
+      const details =
+        event instanceof CustomEvent
+          ? ((event.detail as TrackerEventDetail | undefined)?.details ?? "")
+          : ""
+      logActivity("Calculou orcamento", details, "calculo")
     }
 
-    const handleCopia = (e: CustomEvent) => {
-      logActivity("Copiou orientacoes", e.detail?.details || "", "copia")
+    const handleCopia = (event: Event) => {
+      const details =
+        event instanceof CustomEvent
+          ? ((event.detail as TrackerEventDetail | undefined)?.details ?? "")
+          : ""
+      logActivity("Copiou orientacoes", details, "copia")
     }
 
-    window.addEventListener("orcamento-calculado" as any, handleCalculo)
-    window.addEventListener("orientacoes-copiadas" as any, handleCopia)
+    window.addEventListener("orcamento-calculado", handleCalculo)
+    window.addEventListener("orientacoes-copiadas", handleCopia)
 
     return () => {
-      window.removeEventListener("orcamento-calculado" as any, handleCalculo)
-      window.removeEventListener("orientacoes-copiadas" as any, handleCopia)
+      window.removeEventListener("orcamento-calculado", handleCalculo)
+      window.removeEventListener("orientacoes-copiadas", handleCopia)
     }
   }, [logActivity, isAuthenticated, pathname])
 

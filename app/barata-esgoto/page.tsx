@@ -14,7 +14,7 @@ import {
   findClosestFloorRange,
   formatHours,
 } from "@/lib/calculators/barata-esgoto"
-import { applyPriceIncrease } from "@/lib/calculators/price-adjustment"
+import { applyPriceIncrease, formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function BarataEsgotoPage() {
   const [copied, setCopied] = useState(false)
@@ -31,8 +31,8 @@ export default function BarataEsgotoPage() {
 
 Blocos: ${numBlocos || "-"}
 Andares: ${numAndares || "-"}
-Cartao: ${resultadoCartao !== null ? `R$ ${resultadoCartao.toFixed(2)}` : "-"}
-A vista: ${resultadoVista !== null ? `R$ ${resultadoVista.toFixed(2)}` : "-"}
+Cartao: ${resultadoCartao !== null ? formatBRL(resultadoCartao) : "-"}
+A vista: ${resultadoVista !== null ? formatBRL(resultadoVista) : "-"}
 
 Procedimento: pulverizacao de rodapes, ralos, caixa de gordura e pontos de infestacao.
 Afastamento: 4 a 6h (24h para gestantes, idosos, pessoas alergicas e pets).`
@@ -40,8 +40,8 @@ Afastamento: 4 a 6h (24h para gestantes, idosos, pessoas alergicas e pets).`
 
 Tipo de imovel: ${tipoImovel || "-"}
 Area: ${area || "-"} m2
-Cartao: ${resultadoCartao !== null ? `R$ ${resultadoCartao.toFixed(2)}` : "-"}
-A vista: ${resultadoVista !== null ? `R$ ${resultadoVista.toFixed(2)}` : "-"}
+Cartao: ${resultadoCartao !== null ? formatBRL(resultadoCartao) : "-"}
+A vista: ${resultadoVista !== null ? formatBRL(resultadoVista) : "-"}
 
 Procedimento: pulverizacao de rodapes, ralos, caixa de gordura e pontos de infestacao.
 Afastamento: 4 a 6h (24h para gestantes, idosos, pessoas alergicas e pets).`
@@ -376,14 +376,14 @@ Afastamento: 4 a 6h (24h para gestantes, idosos, pessoas alergicas e pets).`
                         <CreditCard className="w-3 h-3 md:w-4 md:h-4 text-blue-600" />
                         <p className="text-[10px] md:text-xs text-gray-700 font-semibold">Cartão</p>
                       </div>
-                      <p className="text-lg md:text-2xl font-bold text-blue-700">R$ {resultadoCartao.toFixed(2)}</p>
+                      <p className="text-lg md:text-2xl font-bold text-blue-700">{formatBRL(resultadoCartao)}</p>
                     </div>
                     <div className="bg-green-50 border-2 border-green-400 rounded-xl p-3 md:p-4 text-center">
                       <div className="flex items-center justify-center gap-1 md:gap-1.5 mb-1 md:mb-1.5">
                         <Banknote className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
                         <p className="text-[10px] md:text-xs text-gray-700 font-semibold">A Vista</p>
                       </div>
-                      <p className="text-lg md:text-2xl font-bold text-green-700">R$ {resultadoVista.toFixed(2)}</p>
+                      <p className="text-lg md:text-2xl font-bold text-green-700">{formatBRL(resultadoVista)}</p>
                     </div>
                   </div>
                 )}

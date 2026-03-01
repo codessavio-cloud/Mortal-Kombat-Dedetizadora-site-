@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { trackBudgetCalculated, trackGuidanceCopied } from "@/lib/activity/client"
 import { calculatePulgaCarrapatoPercevejoPrice } from "@/lib/calculators/pulga-carrapato-percevejo"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function PulgaCarrapatoPercevejoPage() {
   const [copied, setCopied] = useState(false)
@@ -17,6 +18,12 @@ export default function PulgaCarrapatoPercevejoPage() {
   const [resultadoCartao, setResultadoCartao] = useState<number | null>(null)
   const [resultadoVista, setResultadoVista] = useState<number | null>(null)
   const [erro, setErro] = useState("")
+  const tipoImovelOptions = [
+    { label: "Casa", value: "casa" },
+    { label: "Apartamento", value: "apartamento" },
+    { label: "Comercio", value: "comercio" },
+    { label: "Barracao", value: "barracao" },
+  ] as const
 
   const infoTexto = `PULGA, CARRAPATO E PERCEVEJO - Informacoes Importantes
 
@@ -77,14 +84,21 @@ Observacao: O tratamento deve ser feito em todos os comodos onde ha suspeita de 
   }
 
   const calcularOrcamento = useCallback(() => {
+    const clearResult = () => {
+      setResultadoCartao(null)
+      setResultadoVista(null)
+    }
+
     setErro("")
 
     if (!tipoImovel) {
+      clearResult()
       setErro("Por favor, selecione o tipo de imóvel")
       return
     }
 
     if (!area || area.trim() === "") {
+      clearResult()
       setErro("Por favor, informe a área construída")
       return
     }
@@ -93,22 +107,26 @@ Observacao: O tratamento deve ser feito em todos os comodos onde ha suspeita de 
     const areaNum = Number.parseInt(areaLimpa)
 
     if (isNaN(areaNum) || areaNum <= 0) {
+      clearResult()
       setErro("Por favor, insira uma área válida maior que zero")
       return
     }
 
     if (areaNum > 10000) {
+      clearResult()
       setErro("Área muito grande. Entre em contato para orçamento personalizado")
       return
     }
 
     if (areaNum < 10) {
+      clearResult()
       setErro("Área muito pequena. A área mínima é de 10m²")
       return
     }
 
     const pricing = calculatePulgaCarrapatoPercevejoPrice(areaNum, tipoImovel)
     if (!pricing) {
+      clearResult()
       setErro("Erro ao calcular o preco. Entre em contato para orcamento personalizado")
       return
     }
@@ -171,17 +189,17 @@ Observacao: O tratamento deve ser feito em todos os comodos onde ha suspeita de 
               <div>
                 <Label className="text-xs md:text-sm font-semibold mb-2 block">Tipo de Imóvel</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {["Casa", "Apartamento", "Comércio", "Barracão"].map((tipo) => (
+                  {tipoImovelOptions.map((tipo) => (
                     <button
-                      key={tipo}
-                      onClick={() => setTipoImovel(tipo.toLowerCase())}
+                      key={tipo.value}
+                      onClick={() => setTipoImovel(tipo.value)}
                       className={`py-2 px-3 rounded-lg text-xs md:text-sm font-medium transition-all active:scale-95 ${
-                        tipoImovel === tipo.toLowerCase()
+                        tipoImovel === tipo.value
                           ? "bg-red-600 text-white"
                           : "bg-white border border-gray-300 text-gray-700 hover:border-red-400"
                       }`}
                     >
-                      {tipo}
+                      {tipo.label}
                     </button>
                   ))}
                 </div>
@@ -213,14 +231,14 @@ Observacao: O tratamento deve ser feito em todos os comodos onde ha suspeita de 
                       <CreditCard className="w-3 h-3 text-blue-600" />
                       <p className="text-[10px] md:text-xs text-gray-700 font-semibold">Cartão</p>
                     </div>
-                    <p className="text-base md:text-lg font-bold text-blue-700">R$ {resultadoCartao.toFixed(2)}</p>
+                    <p className="text-base md:text-lg font-bold text-blue-700">{formatBRL(resultadoCartao)}</p>
                   </div>
                   <div className="bg-green-50 border border-green-400 rounded-lg p-2 md:p-3 text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <Banknote className="w-3 h-3 text-green-600" />
                       <p className="text-[10px] md:text-xs text-gray-700 font-semibold">A Vista</p>
                     </div>
-                    <p className="text-base md:text-lg font-bold text-green-700">R$ {resultadoVista.toFixed(2)}</p>
+                    <p className="text-base md:text-lg font-bold text-green-700">{formatBRL(resultadoVista)}</p>
                   </div>
                 </div>
               )}

@@ -86,12 +86,8 @@ export function parseStringQueryParam(
     return { value: null, error: null }
   }
 
-  const sanitized = sanitizePlainText(value, config.maxLength)
-  if (sanitized.length === 0 && !config.allowEmpty) {
-    return { value: null, error: null }
-  }
-
-  if (sanitized.length > config.maxLength) {
+  const sanitizedFull = sanitizePlainText(value, Number.MAX_SAFE_INTEGER)
+  if (sanitizedFull.length > config.maxLength) {
     return {
       value: null,
       error: {
@@ -100,6 +96,11 @@ export function parseStringQueryParam(
         details: { param: config.name, maxLength: config.maxLength },
       },
     }
+  }
+
+  const sanitized = sanitizePlainText(sanitizedFull, config.maxLength)
+  if (sanitized.length === 0 && !config.allowEmpty) {
+    return { value: null, error: null }
   }
 
   return { value: sanitized, error: null }

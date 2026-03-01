@@ -18,6 +18,10 @@ export function isValidUserId(value: string) {
   return UUID_PATTERN.test(value)
 }
 
+export function isUuid(value: string) {
+  return UUID_PATTERN.test(value)
+}
+
 export function sanitizePlainText(value: string, maxLength: number) {
   const normalized = Array.from(value, (char) => {
     const code = char.charCodeAt(0)

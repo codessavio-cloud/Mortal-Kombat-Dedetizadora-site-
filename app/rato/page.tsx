@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { trackBudgetCalculated, trackGuidanceCopied } from "@/lib/activity/client"
 import { calculateRatoCondominioPrice, calculateRatoResidentialPrice } from "@/lib/calculators/rato"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function RatoPage() {
   const [copied, setCopied] = useState(false)
@@ -59,8 +60,8 @@ export default function RatoPage() {
       ? `RATO - ORÇAMENTO RESIDENCIAL
 Área: ${area}m²
 Visitas: ${tipoVisita}
-Cartão: R$ ${resultadoCartao?.toFixed(2)}
-À Vista: R$ ${resultadoVista?.toFixed(2)}
+Cartão: ${resultadoCartao !== null ? formatBRL(resultadoCartao) : "-"}
+À Vista: ${resultadoVista !== null ? formatBRL(resultadoVista) : "-"}
 Porta Iscas: ${portaIscas}
 Tempo: ${tempo}
 
@@ -72,8 +73,8 @@ O tratamento consiste em instalação de porta iscas seguido de 3 monitoramentos
 Blocos: ${numBlocos}
 Andares: ${numAndares}
 Visitas: ${tipoVisita}
-Cartão: R$ ${resultadoCartao?.toFixed(2)}
-À Vista: R$ ${resultadoVista?.toFixed(2)}
+Cartão: ${resultadoCartao !== null ? formatBRL(resultadoCartao) : "-"}
+À Vista: ${resultadoVista !== null ? formatBRL(resultadoVista) : "-"}
 Porta Iscas: ${portaIscas}
 Tempo: ${tempo}
 
@@ -350,18 +351,14 @@ O tratamento consiste em instalação de porta iscas seguido de 3 monitoramentos
                               <CreditCard className="w-3 h-3 text-blue-600" />
                               <p className="text-xs text-gray-700 font-semibold">Cartão</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-blue-700">
-                              R$ {resultadoCartao.toFixed(2)}
-                            </p>
+                            <p className="text-lg sm:text-xl font-bold text-blue-700">{formatBRL(resultadoCartao)}</p>
                           </div>
                           <div className="bg-green-50 border-2 border-green-400 rounded-xl p-2 sm:p-3 text-center">
                             <div className="flex items-center justify-center gap-1 mb-1">
                               <Banknote className="w-3 h-3 text-green-600" />
                               <p className="text-xs text-gray-700 font-semibold">À Vista</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-green-700">
-                              R$ {resultadoVista.toFixed(2)}
-                            </p>
+                            <p className="text-lg sm:text-xl font-bold text-green-700">{formatBRL(resultadoVista)}</p>
                           </div>
                         </div>
                         {portaIscas && tempo && (

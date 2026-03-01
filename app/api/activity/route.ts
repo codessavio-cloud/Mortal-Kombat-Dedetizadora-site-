@@ -8,7 +8,7 @@ import { getAuthenticatedUser } from "@/lib/auth/session"
 import { appLogger } from "@/lib/observability/logger"
 import { parseJsonBodyWithLimit } from "@/lib/security/body"
 import { enforceSameOrigin } from "@/lib/security/request"
-import { normalizeCoordinate, normalizeOptionalText, sanitizePlainText } from "@/lib/security/validation"
+import { isUuid, normalizeCoordinate, normalizeOptionalText, sanitizePlainText } from "@/lib/security/validation"
 import { createClient } from "@/lib/supabase/server"
 
 const EMPTY_STATS = {
@@ -34,7 +34,7 @@ type CursorPayload = {
 
 type ActivityLogRow = {
   id: string
-  user_id: string
+  user_id: string | null
   username: string
   action: string
   details: string | null
@@ -47,6 +47,26 @@ type ActivityLogRow = {
 type CountQueryResult = {
   count: number | null
   error: unknown
+}
+
+interface FilterQuery<TSelf> {
+  eq(column: string, value: string): TSelf
+  ilike(column: string, pattern: string): TSelf
+  or(filters: string): TSelf
+  not(column: string, operator: string, value: string): TSelf
+}
+
+interface ActivityLogsQuery extends FilterQuery<ActivityLogsQuery> {
+  order(column: string, options: { ascending: boolean }): ActivityLogsQuery
+  limit(count: number): ActivityLogsQuery
+  lte(column: string, value: string): ActivityLogsQuery
+  then: PromiseLike<{ data: ActivityLogRow[] | null; error: unknown }>["then"]
+}
+
+interface ActivityCountQuery
+  extends FilterQuery<ActivityCountQuery>,
+    PromiseLike<CountQueryResult> {
+  gte(column: string, value: string): ActivityCountQuery
 }
 
 function parseActivityType(value: string | null) {
@@ -125,7 +145,11 @@ function toSearchPattern(search: string) {
   return `%${safeSearch}%`
 }
 
-function applyBaseFilters(query: any, username: string | null, search: string | null) {
+function applyBaseFilters<TQuery extends FilterQuery<TQuery>>(
+  query: TQuery,
+  username: string | null,
+  search: string | null,
+) {
   let nextQuery = query
 
   if (username && username !== "todos") {
@@ -140,7 +164,7 @@ function applyBaseFilters(query: any, username: string | null, search: string | 
   return nextQuery
 }
 
-function applyTypeFilter(query: any, activityType: ActivityType) {
+function applyTypeFilter<TQuery extends FilterQuery<TQuery>>(query: TQuery, activityType: ActivityType) {
   switch (activityType) {
     case "login":
       return query.eq("action", "Login")
@@ -166,7 +190,10 @@ function applyTypeFilter(query: any, activityType: ActivityType) {
   }
 }
 
-function applyFilters(query: any, filters: { username: string | null; search: string | null; type: ActivityType }) {
+function applyFilters<TQuery extends FilterQuery<TQuery>>(
+  query: TQuery,
+  filters: { username: string | null; search: string | null; type: ActivityType },
+) {
   return applyTypeFilter(applyBaseFilters(query, filters.username, filters.search), filters.type)
 }
 
@@ -212,6 +239,15 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
+  const rawSearchParam = searchParams.get("search")
+  const normalizedRawSearch =
+    rawSearchParam === null ? null : sanitizePlainText(rawSearchParam, Number.MAX_SAFE_INTEGER)
+  if (normalizedRawSearch && normalizedRawSearch.length > 120) {
+    return apiError(400, "search excede o tamanho permitido", "INVALID_QUERY_PARAM_RANGE", {
+      param: "search",
+      maxLength: 120,
+    })
+  }
 
   const limitResult = parseIntegerQueryParam(searchParams.get("limit"), {
     name: "limit",
@@ -299,7 +335,7 @@ export async function GET(request: Request) {
     .select("id, user_id, username, action, details, page, created_at, latitude, longitude")
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(limit + CURSOR_QUERY_BUFFER)
+    .limit(limit + CURSOR_QUERY_BUFFER) as unknown as ActivityLogsQuery
 
   logsQuery = applyFilters(logsQuery, {
     username,
@@ -346,7 +382,9 @@ export async function GET(request: Request) {
   const todayIso = today.toISOString()
 
   const buildCountQuery = () => {
-    let countQuery = supabase.from("activity_logs").select("*", { count: "exact", head: true })
+    let countQuery = supabase
+      .from("activity_logs")
+      .select("*", { count: "exact", head: true }) as unknown as ActivityCountQuery
     if (username && username !== "todos") {
       countQuery = countQuery.eq("username", username)
     }
@@ -419,7 +457,7 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     const { error } = await supabase.from("activity_logs").insert({
-      user_id: user.userId,
+      user_id: isUuid(user.userId) ? user.userId : null,
       username: user.username,
       action,
       details,

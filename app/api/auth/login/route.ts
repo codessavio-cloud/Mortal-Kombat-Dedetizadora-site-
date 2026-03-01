@@ -12,8 +12,8 @@ import {
 } from "@/lib/auth/constants"
 import { isJwtSecretConfigured, signAuthToken, type UserRole } from "@/lib/auth/jwt"
 import { hashPassword, verifyPassword } from "@/lib/auth/password"
-import { apiError } from "@/lib/api/response"
 import { appLogger } from "@/lib/observability/logger"
+import { recordAuthMetric } from "@/lib/observability/auth-metrics"
 import { parseJsonBodyWithLimit } from "@/lib/security/body"
 import { enforceSameOrigin } from "@/lib/security/request"
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/lib/security/validation"
 import { createClient } from "@/lib/supabase/server"
 import { isSupabasePublicConfigured } from "@/lib/supabase/config"
+import { resolvePostLoginRedirect } from "@/lib/auth/session-utils"
 
 const MAX_LOGIN_PAYLOAD_BYTES = 8 * 1024
 const loginAttemptsByIp = new Map<string, { count: number; lastAttempt: number; blocked: boolean }>()
@@ -52,20 +53,50 @@ interface SupabaseAuthResult {
   backendUnavailable: boolean
 }
 
+interface LoginErrorResponse {
+  error: string
+  code: string
+  retryAfterSeconds?: number
+  remainingAttempts?: number
+  redirectTo?: string
+}
+
+function buildLoginErrorResponse(
+  status: number,
+  body: LoginErrorResponse,
+  options?: { requestId?: string; retryAfterSeconds?: number },
+) {
+  const response = NextResponse.json(body, { status })
+
+  if (options?.requestId) {
+    response.headers.set("X-Request-Id", options.requestId)
+  }
+
+  if (typeof options?.retryAfterSeconds === "number") {
+    response.headers.set("Retry-After", String(options.retryAfterSeconds))
+  }
+
+  return response
+}
+
 function getClientIp(request: Request) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
 }
 
 function getFallbackAdminFromEnv() {
-  const username = process.env.ADMIN_FALLBACK_USERNAME ?? process.env.CALCULATOR_USERNAME
-  const password = process.env.ADMIN_FALLBACK_PASSWORD ?? process.env.CALCULATOR_PASSWORD
+  const username = (
+    process.env.ADMIN_FALLBACK_USERNAME ?? process.env.CALCULATOR_USERNAME
+  )?.trim()
+  const password = (
+    process.env.ADMIN_FALLBACK_PASSWORD ?? process.env.CALCULATOR_PASSWORD
+  )?.trim()
 
   if (!username || !password) {
     return null
   }
 
   return {
-    id: process.env.ADMIN_FALLBACK_ID ?? FALLBACK_ADMIN_DEFAULT_ID,
+    id: (process.env.ADMIN_FALLBACK_ID ?? FALLBACK_ADMIN_DEFAULT_ID).trim(),
     username,
     password,
     role: "admin" as const,
@@ -231,27 +262,29 @@ function authenticateWithFallback(
   } satisfies AuthenticatedUser
 }
 
-function shouldBlockAttempt(
+function getRetryAfterSecondsForBlockedAttempt(
   registry: Map<string, { count: number; lastAttempt: number; blocked: boolean }>,
   key: string,
   now: number,
 ) {
   const attempts = registry.get(key)
   if (!attempts) {
-    return false
+    return null
   }
 
-  if (now - attempts.lastAttempt > AUTH_LOGIN_BLOCK_WINDOW_MS) {
+  const elapsedMs = now - attempts.lastAttempt
+  if (elapsedMs > AUTH_LOGIN_BLOCK_WINDOW_MS) {
     registry.delete(key)
-    return false
+    return null
   }
 
   if (attempts.blocked || attempts.count >= AUTH_LOGIN_MAX_ATTEMPTS) {
     registry.set(key, { ...attempts, blocked: true, lastAttempt: now })
-    return true
+    const remainingMs = Math.max(0, AUTH_LOGIN_BLOCK_WINDOW_MS - elapsedMs)
+    return Math.max(1, Math.ceil(remainingMs / 1000))
   }
 
-  return false
+  return null
 }
 
 function registerFailedAttempt(
@@ -269,6 +302,7 @@ function registerFailedAttempt(
 
 export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id") || undefined
+  const startedAt = Date.now()
   const sameOriginError = enforceSameOrigin(request, "/api/auth/login")
   if (sameOriginError) {
     return sameOriginError
@@ -277,25 +311,47 @@ export async function POST(request: Request) {
   const now = Date.now()
   const ip = getClientIp(request)
 
-  if (shouldBlockAttempt(loginAttemptsByIp, ip, now)) {
+  const blockedIpRetryAfter = getRetryAfterSecondsForBlockedAttempt(loginAttemptsByIp, ip, now)
+  if (blockedIpRetryAfter !== null) {
     appLogger.warn("Tentativa de login bloqueada por limite de tentativas", {
       route: "/api/auth/login",
       requestId,
       ip,
       scope: "ip",
+      retryAfterSeconds: blockedIpRetryAfter,
     })
-    return apiError(
+    recordAuthMetric("login_rate_limited", {
+      requestId,
+      code: "RATE_LIMITED",
+      latencyMs: Date.now() - startedAt,
+    })
+    return buildLoginErrorResponse(
       429,
-      `Muitas tentativas de login. Aguarde ${AUTH_LOGIN_BLOCK_WINDOW_SECONDS} segundos.`,
-      "RATE_LIMITED",
+      {
+        error: `Muitas tentativas de login. Aguarde ${blockedIpRetryAfter} segundos.`,
+        code: "RATE_LIMITED",
+        retryAfterSeconds: blockedIpRetryAfter,
+        remainingAttempts: 0,
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+        retryAfterSeconds: blockedIpRetryAfter,
+      },
     )
   }
 
   if (!isJwtSecretConfigured()) {
-    return apiError(
+    return buildLoginErrorResponse(
       503,
-      "JWT_SECRET nao configurado no ambiente.",
-      AUTH_ERROR_CODES.jwtNotConfigured,
+      {
+        error: "JWT_SECRET nao configurado no ambiente.",
+        code: AUTH_ERROR_CODES.jwtNotConfigured,
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
     )
   }
 
@@ -313,33 +369,76 @@ export async function POST(request: Request) {
   const location = parseLoginLocation(body?.location)
 
   if (!username || !password) {
-    return apiError(400, "Usuario e senha sao obrigatorios", "MISSING_CREDENTIALS")
+    return buildLoginErrorResponse(
+      400,
+      {
+        error: "Usuario e senha sao obrigatorios",
+        code: "MISSING_CREDENTIALS",
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
+    )
   }
 
   if (!isValidUsername(username)) {
-    return apiError(
+    return buildLoginErrorResponse(
       400,
-      "Usuario invalido. Use apenas letras, numeros, ponto, traco e underscore.",
-      "INVALID_USERNAME",
+      {
+        error: "Usuario invalido. Use apenas letras, numeros, ponto, traco e underscore.",
+        code: "INVALID_USERNAME",
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
     )
   }
 
   if (!validatePasswordLength(password)) {
-    return apiError(400, "Senha invalida (tamanho fora do permitido)", "INVALID_PASSWORD_LENGTH")
+    return buildLoginErrorResponse(
+      400,
+      {
+        error: "Senha invalida (tamanho fora do permitido)",
+        code: "INVALID_PASSWORD_LENGTH",
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
+    )
   }
 
   const usernameKey = username.toLowerCase()
-  if (shouldBlockAttempt(loginAttemptsByUsername, usernameKey, now)) {
+  const blockedUsernameRetryAfter = getRetryAfterSecondsForBlockedAttempt(loginAttemptsByUsername, usernameKey, now)
+  if (blockedUsernameRetryAfter !== null) {
     appLogger.warn("Tentativa de login bloqueada por limite de tentativas", {
       route: "/api/auth/login",
       ip,
       username,
       scope: "username",
+      retryAfterSeconds: blockedUsernameRetryAfter,
     })
-    return apiError(
+    recordAuthMetric("login_rate_limited", {
+      requestId,
+      username,
+      code: "RATE_LIMITED",
+      latencyMs: Date.now() - startedAt,
+    })
+    return buildLoginErrorResponse(
       429,
-      `Muitas tentativas de login. Aguarde ${AUTH_LOGIN_BLOCK_WINDOW_SECONDS} segundos.`,
-      "RATE_LIMITED",
+      {
+        error: `Muitas tentativas de login. Aguarde ${blockedUsernameRetryAfter} segundos.`,
+        code: "RATE_LIMITED",
+        retryAfterSeconds: blockedUsernameRetryAfter,
+        remainingAttempts: 0,
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+        retryAfterSeconds: blockedUsernameRetryAfter,
+      },
     )
   }
 
@@ -362,10 +461,16 @@ export async function POST(request: Request) {
       fallbackDisabledInProduction:
         process.env.NODE_ENV === "production" && !fallbackEnabled,
     })
-    return apiError(
+    return buildLoginErrorResponse(
       503,
-      "Nenhum backend de autenticacao configurado (Supabase ou fallback admin habilitado).",
-      "AUTH_BACKEND_NOT_CONFIGURED",
+      {
+        error: "Nenhum backend de autenticacao configurado (Supabase ou fallback admin habilitado).",
+        code: "AUTH_BACKEND_NOT_CONFIGURED",
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
     )
   }
 
@@ -384,22 +489,73 @@ export async function POST(request: Request) {
         ip,
         username,
       })
-      return apiError(
+      return buildLoginErrorResponse(
         503,
-        "Servico de autenticacao indisponivel no momento.",
-        "AUTH_BACKEND_UNAVAILABLE",
+        {
+          error: "Servico de autenticacao indisponivel no momento.",
+          code: "AUTH_BACKEND_UNAVAILABLE",
+          redirectTo: "/login",
+        },
+        {
+          requestId,
+        },
       )
     }
 
+    const nextAttemptCount = (loginAttemptsByUsername.get(usernameKey)?.count || 0) + 1
+    const remainingAttempts = Math.max(0, AUTH_LOGIN_MAX_ATTEMPTS - nextAttemptCount)
+
     registerFailedAttempt(loginAttemptsByIp, ip, now)
     registerFailedAttempt(loginAttemptsByUsername, usernameKey, now)
+
+    const exceededLimit = remainingAttempts === 0
+    if (exceededLimit) {
+      recordAuthMetric("login_rate_limited", {
+        requestId,
+        username,
+        code: "RATE_LIMITED",
+        latencyMs: Date.now() - startedAt,
+      })
+      return buildLoginErrorResponse(
+        429,
+        {
+          error: `Muitas tentativas de login. Aguarde ${AUTH_LOGIN_BLOCK_WINDOW_SECONDS} segundos.`,
+          code: "RATE_LIMITED",
+          retryAfterSeconds: AUTH_LOGIN_BLOCK_WINDOW_SECONDS,
+          remainingAttempts: 0,
+          redirectTo: "/login",
+        },
+        {
+          requestId,
+          retryAfterSeconds: AUTH_LOGIN_BLOCK_WINDOW_SECONDS,
+        },
+      )
+    }
+
     appLogger.warn("Falha de autenticacao por credenciais invalidas", {
       route: "/api/auth/login",
       requestId,
       ip,
       username,
     })
-    return apiError(401, "Credenciais invalidas", AUTH_ERROR_CODES.invalidCredentials)
+    recordAuthMetric("login_failed", {
+      requestId,
+      username,
+      code: AUTH_ERROR_CODES.invalidCredentials,
+      latencyMs: Date.now() - startedAt,
+    })
+    return buildLoginErrorResponse(
+      401,
+      {
+        error: "Credenciais invalidas",
+        code: AUTH_ERROR_CODES.invalidCredentials,
+        remainingAttempts,
+        redirectTo: "/login",
+      },
+      {
+        requestId,
+      },
+    )
   }
 
   loginAttemptsByIp.delete(ip)
@@ -412,6 +568,13 @@ export async function POST(request: Request) {
     role: user.role,
     source: supabaseResult.user ? "supabase" : "fallback",
   })
+  recordAuthMetric("login_success", {
+    requestId,
+    username: user.username,
+    role: user.role,
+    source: supabaseResult.user ? "supabase" : "fallback",
+    latencyMs: Date.now() - startedAt,
+  })
 
   const token = await signAuthToken({
     id: user.id,
@@ -420,10 +583,20 @@ export async function POST(request: Request) {
     role: user.role,
   })
 
+  const expiresAt = new Date(Date.now() + AUTH_SESSION_TTL_SECONDS * 1000).toISOString()
+  const redirectTo = resolvePostLoginRedirect({ role: user.role })
+
   const response = NextResponse.json({
     success: true,
     user: { id: user.id, username: user.username, role: user.role },
+    redirectTo,
+    expiresAt,
+    sessionStatus: "authenticated",
   })
+
+  if (requestId) {
+    response.headers.set("X-Request-Id", requestId)
+  }
 
   response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,

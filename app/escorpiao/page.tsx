@@ -14,6 +14,7 @@ import {
   formatEscorpiaoHours,
   getEscorpiaoCondominioLabor,
 } from "@/lib/calculators/escorpiao"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function EscorpiaoPage() {
   const [copied, setCopied] = useState(false)
@@ -274,11 +275,11 @@ Cuidados com animais: guardar pertences, lavar vasilhas ao retornar.`
                   <div className="grid grid-cols-2 gap-2 md:gap-4">
                     <div className="bg-blue-50 p-3 md:p-4 rounded-xl text-center border-2 border-blue-200">
                       <span className="text-xs md:text-sm text-blue-700 font-semibold">Cartão</span>
-                      <div className="text-lg md:text-2xl font-bold text-blue-800">R$ {resultadoCartao.toFixed(2)}</div>
+                      <div className="text-lg md:text-2xl font-bold text-blue-800">{formatBRL(resultadoCartao)}</div>
                     </div>
                     <div className="bg-green-50 p-3 md:p-4 rounded-xl text-center border-2 border-green-200">
                       <span className="text-xs md:text-sm text-green-700 font-semibold">À Vista</span>
-                      <div className="text-lg md:text-2xl font-bold text-green-800">R$ {resultadoVista.toFixed(2)}</div>
+                      <div className="text-lg md:text-2xl font-bold text-green-800">{formatBRL(resultadoVista)}</div>
                     </div>
                   </div>
                 )}

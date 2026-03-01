@@ -124,9 +124,14 @@ function apiErrorResponse(
   requestId: string,
   headers?: Record<string, string>,
   rateLimitRemaining?: number | null,
+  bodyExtras?: Record<string, unknown>,
 ) {
   const response = NextResponse.json(
-    { error, code },
+    {
+      error,
+      code,
+      ...(bodyExtras || {}),
+    },
     {
       status,
       headers,
@@ -221,6 +226,29 @@ function blockIp(ip: string, now: number) {
   blockedIPs.set(ip, now + AUTH_BLOCKED_IP_TTL_MS)
 }
 
+function releaseBlockedIp(ip: string, requestId: string, pathname: string, reason: string) {
+  blockedIPs.delete(ip)
+  suspiciousActivity.delete(ip)
+  appLogger.warn("Bloqueio de IP liberado automaticamente", {
+    route: "proxy",
+    requestId,
+    ip,
+    pathname,
+    reason,
+  })
+}
+
+function buildLoginRedirectUrl(request: NextRequest) {
+  const loginUrl = new URL("/login", request.url)
+  const requestedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+
+  if (requestedPath !== "/login" && requestedPath.startsWith("/") && !requestedPath.startsWith("//")) {
+    loginUrl.searchParams.set("next", requestedPath)
+  }
+
+  return loginUrl
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const ip = getClientIP(request)
@@ -245,7 +273,25 @@ export async function proxy(request: NextRequest) {
   pruneSecurityState(now)
 
   if (isIpBlocked(ip, now)) {
-    if (pathname.startsWith("/api/")) {
+    const blockedToken = request.cookies.get(AUTH_COOKIE_NAME)
+    if (blockedToken) {
+      const blockedPayload = await verifyAuthToken(blockedToken.value)
+      if (blockedPayload) {
+        releaseBlockedIp(ip, requestId, pathname, "authenticated-session")
+        return nextResponse()
+      }
+    }
+
+    const isApiRoute = pathname.startsWith("/api/")
+    const isAuthApiRoute = pathname.startsWith("/api/auth/")
+
+    if (!isApiRoute || isAuthApiRoute) {
+      releaseBlockedIp(ip, requestId, pathname, isAuthApiRoute ? "auth-api-route" : "human-navigation")
+      if (isAuthApiRoute) {
+        return nextResponse()
+      }
+      // Continue the normal middleware auth checks for page routes.
+    } else {
       return apiErrorResponse(
         403,
         "Acesso bloqueado por atividade suspeita",
@@ -255,12 +301,6 @@ export async function proxy(request: NextRequest) {
         rateLimitRemaining,
       )
     }
-
-    return secureResponse(
-      new NextResponse("Acesso bloqueado por atividade suspeita", { status: 403 }),
-      requestId,
-      rateLimitRemaining,
-    )
   }
 
   if (isSuspiciousRequest(request)) {
@@ -323,12 +363,20 @@ export async function proxy(request: NextRequest) {
           "X-RateLimit-Remaining": "0",
         },
         0,
+        {
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
       )
     }
     rateLimitRemaining = rateLimit.remaining
   }
 
-  if (pathname === "/login" || pathname.startsWith("/api/auth/login")) {
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/api/auth/logout") ||
+    pathname.startsWith("/api/auth/me")
+  ) {
     return nextResponse()
   }
 
@@ -344,7 +392,7 @@ export async function proxy(request: NextRequest) {
       )
     }
 
-    return secureResponse(NextResponse.redirect(new URL("/login", request.url)), requestId, rateLimitRemaining)
+    return secureResponse(NextResponse.redirect(buildLoginRedirectUrl(request)), requestId, rateLimitRemaining)
   }
 
   if (pathname.startsWith("/api/") && pathname !== "/api/auth/login") {
@@ -387,49 +435,66 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    const adminRoutes = ["/api/users", "/api/db/clear", "/api/db/stats"]
-    if (adminRoutes.some((route) => pathname.startsWith(route)) && payload.role !== "admin") {
-      return apiErrorResponse(
-        403,
-        "Acesso negado",
-        AUTH_ERROR_CODES.forbidden,
-        requestId,
-        undefined,
-        rateLimitRemaining,
-      )
-    }
-
-    const userIdMatch = pathname.match(/\/users\/([^/?#]+)/)
-    if (userIdMatch && payload.role !== "admin") {
-      const requestedUserId = userIdMatch[1]
-      if (requestedUserId !== String(payload.userId)) {
-        appLogger.warn("Tentativa de acesso indevido a recurso de usuario", {
-          route: "proxy",
-          requestId,
-          actorUsername: payload.username,
-          actorUserId: payload.userId,
-          requestedUserId,
-        })
+    if (payload.role !== "admin") {
+      if (pathname.startsWith("/api/db/clear") || pathname.startsWith("/api/db/stats")) {
         return apiErrorResponse(
           403,
-          "Acesso negado ao recurso",
+          "Acesso negado",
           AUTH_ERROR_CODES.forbidden,
           requestId,
           undefined,
           rateLimitRemaining,
         )
       }
+
+      const isUsersCollectionRoute = pathname === "/api/users" || pathname === "/api/users/"
+      if (isUsersCollectionRoute) {
+        return apiErrorResponse(
+          403,
+          "Acesso negado",
+          AUTH_ERROR_CODES.forbidden,
+          requestId,
+          undefined,
+          rateLimitRemaining,
+        )
+      }
+
+      const userIdMatch = pathname.match(/^\/api\/users\/([^/?#]+)$/)
+      if (userIdMatch) {
+        const requestedUserId = userIdMatch[1]
+        const isOwnResource = requestedUserId === String(payload.userId)
+        const isOwnPasswordUpdate = request.method === "PATCH" && isOwnResource
+
+        if (!isOwnPasswordUpdate) {
+          appLogger.warn("Tentativa de acesso indevido a recurso de usuario", {
+            route: "proxy",
+            requestId,
+            actorUsername: payload.username,
+            actorUserId: payload.userId,
+            requestedUserId,
+            method: request.method,
+          })
+          return apiErrorResponse(
+            403,
+            "Acesso negado ao recurso",
+            AUTH_ERROR_CODES.forbidden,
+            requestId,
+            undefined,
+            rateLimitRemaining,
+          )
+        }
+      }
     }
   }
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)
   if (!token) {
-    return secureResponse(NextResponse.redirect(new URL("/login", request.url)), requestId, rateLimitRemaining)
+    return secureResponse(NextResponse.redirect(buildLoginRedirectUrl(request)), requestId, rateLimitRemaining)
   }
 
   const payload = await verifyAuthToken(token.value)
   if (!payload) {
-    return secureResponse(NextResponse.redirect(new URL("/login", request.url)), requestId, rateLimitRemaining)
+    return secureResponse(NextResponse.redirect(buildLoginRedirectUrl(request)), requestId, rateLimitRemaining)
   }
 
   if (pathname === "/admin" && payload.role !== "admin") {

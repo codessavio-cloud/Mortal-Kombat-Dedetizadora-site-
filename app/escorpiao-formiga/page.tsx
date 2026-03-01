@@ -14,6 +14,7 @@ import {
   formatComboHours,
   getComboCondominioLabor,
 } from "@/lib/calculators/escorpiao-formiga"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
 
 export default function EscorpiaoFormigaPage() {
   const [copied, setCopied] = useState(false)
@@ -208,10 +209,10 @@ Gel: já está incluso no valor e já fica agendado junto com a pulverização.`
                 <div>
                   <Label className="text-xs md:text-sm font-semibold mb-2 block">Tipo de Imóvel</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {["condominio", "casa", "apartamento", "comercio", "barracao"].map((tipo) => (
+                    {(["condominio", "casa", "apartamento", "comercio", "barracao"] as const).map((tipo) => (
                       <button
                         key={tipo}
-                        onClick={() => setTipoImovel(tipo as any)}
+                        onClick={() => setTipoImovel(tipo)}
                         className={`py-2 md:py-2.5 px-3 md:px-4 rounded-lg font-semibold text-xs md:text-sm transition-colors active:scale-95 ${tipoImovel === tipo ? "bg-red-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:border-red-400"}`}
                       >
                         {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
@@ -294,11 +295,11 @@ Gel: já está incluso no valor e já fica agendado junto com a pulverização.`
                   <div className="grid grid-cols-2 gap-2 md:gap-4">
                     <div className="bg-blue-50 p-3 md:p-4 rounded-xl text-center border-2 border-blue-200">
                       <span className="text-xs md:text-sm text-blue-700 font-semibold">Cartão</span>
-                      <div className="text-lg md:text-2xl font-bold text-blue-800">R$ {resultadoCartao.toFixed(2)}</div>
+                      <div className="text-lg md:text-2xl font-bold text-blue-800">{formatBRL(resultadoCartao)}</div>
                     </div>
                     <div className="bg-green-50 p-3 md:p-4 rounded-xl text-center border-2 border-green-200">
                       <span className="text-xs md:text-sm text-green-700 font-semibold">À Vista</span>
-                      <div className="text-lg md:text-2xl font-bold text-green-800">R$ {resultadoVista.toFixed(2)}</div>
+                      <div className="text-lg md:text-2xl font-bold text-green-800">{formatBRL(resultadoVista)}</div>
                     </div>
                   </div>
                 )}

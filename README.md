@@ -18,8 +18,11 @@ npm run lint
 npm run typecheck
 npm run build
 npm run check
+npm test
 npm run security:test
 ```
+
+`npm run security:test` sobe um servidor local temporario, executa os checks e encerra automaticamente.
 
 ## Variaveis de ambiente
 
@@ -118,12 +121,16 @@ app/
   login/
   ...paginas de calculo
 components/
+  admin/
   activity-tracker.tsx
   ui/
     button.tsx
     input.tsx
     label.tsx
+hooks/
+  admin/
 lib/
+  admin/
   api/
   auth/
   security/

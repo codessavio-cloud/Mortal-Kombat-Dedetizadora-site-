@@ -5,8 +5,9 @@ export function apiError(
   error: string,
   code?: string,
   details?: unknown,
+  requestId?: string,
 ) {
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
       error,
       ...(code ? { code } : {}),
@@ -14,4 +15,10 @@ export function apiError(
     },
     { status },
   )
+
+  if (requestId) {
+    response.headers.set("X-Request-Id", requestId)
+  }
+
+  return response
 }

@@ -50,6 +50,15 @@ export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
+    const rawSearchParam = searchParams.get("search")
+    const normalizedRawSearch =
+      rawSearchParam === null ? null : sanitizePlainText(rawSearchParam, Number.MAX_SAFE_INTEGER)
+    if (normalizedRawSearch && normalizedRawSearch.length > 64) {
+      return apiError(400, "search excede o tamanho permitido", "INVALID_QUERY_PARAM_RANGE", {
+        param: "search",
+        maxLength: 64,
+      })
+    }
     const hasPaginationParams =
       searchParams.has("page") ||
       searchParams.has("pageSize") ||

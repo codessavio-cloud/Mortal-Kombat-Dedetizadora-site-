@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     request,
     MAX_CLEAR_PAYLOAD_BYTES,
     "/api/db/clear",
+    { allowMissingContentTypeForEmptyBody: true },
   )
   if (parseError) {
     return parseError
