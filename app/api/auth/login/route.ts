@@ -7,6 +7,7 @@ import {
   AUTH_LOGIN_BLOCK_WINDOW_MS,
   AUTH_LOGIN_BLOCK_WINDOW_SECONDS,
   AUTH_LOGIN_MAX_ATTEMPTS,
+  AUTH_LOGIN_MAX_ATTEMPTS_PER_IP,
   AUTH_SESSION_TTL_SECONDS,
   FALLBACK_ADMIN_DEFAULT_ID,
 } from "@/lib/auth/constants"
@@ -266,6 +267,7 @@ function getRetryAfterSecondsForBlockedAttempt(
   registry: Map<string, { count: number; lastAttempt: number; blocked: boolean }>,
   key: string,
   now: number,
+  maxAttempts: number,
 ) {
   const attempts = registry.get(key)
   if (!attempts) {
@@ -278,7 +280,7 @@ function getRetryAfterSecondsForBlockedAttempt(
     return null
   }
 
-  if (attempts.blocked || attempts.count >= AUTH_LOGIN_MAX_ATTEMPTS) {
+  if (attempts.blocked || attempts.count >= maxAttempts) {
     registry.set(key, { ...attempts, blocked: true, lastAttempt: now })
     const remainingMs = Math.max(0, AUTH_LOGIN_BLOCK_WINDOW_MS - elapsedMs)
     return Math.max(1, Math.ceil(remainingMs / 1000))
@@ -291,12 +293,13 @@ function registerFailedAttempt(
   registry: Map<string, { count: number; lastAttempt: number; blocked: boolean }>,
   key: string,
   now: number,
+  maxAttempts: number,
 ) {
   const currentAttempts = registry.get(key) ?? { count: 0, lastAttempt: now, blocked: false }
   registry.set(key, {
     count: currentAttempts.count + 1,
     lastAttempt: now,
-    blocked: currentAttempts.count + 1 >= AUTH_LOGIN_MAX_ATTEMPTS,
+    blocked: currentAttempts.count + 1 >= maxAttempts,
   })
 }
 
@@ -311,7 +314,12 @@ export async function POST(request: Request) {
   const now = Date.now()
   const ip = getClientIp(request)
 
-  const blockedIpRetryAfter = getRetryAfterSecondsForBlockedAttempt(loginAttemptsByIp, ip, now)
+  const blockedIpRetryAfter = getRetryAfterSecondsForBlockedAttempt(
+    loginAttemptsByIp,
+    ip,
+    now,
+    AUTH_LOGIN_MAX_ATTEMPTS_PER_IP,
+  )
   if (blockedIpRetryAfter !== null) {
     appLogger.warn("Tentativa de login bloqueada por limite de tentativas", {
       route: "/api/auth/login",
@@ -411,7 +419,12 @@ export async function POST(request: Request) {
   }
 
   const usernameKey = username.toLowerCase()
-  const blockedUsernameRetryAfter = getRetryAfterSecondsForBlockedAttempt(loginAttemptsByUsername, usernameKey, now)
+  const blockedUsernameRetryAfter = getRetryAfterSecondsForBlockedAttempt(
+    loginAttemptsByUsername,
+    usernameKey,
+    now,
+    AUTH_LOGIN_MAX_ATTEMPTS,
+  )
   if (blockedUsernameRetryAfter !== null) {
     appLogger.warn("Tentativa de login bloqueada por limite de tentativas", {
       route: "/api/auth/login",
@@ -505,8 +518,8 @@ export async function POST(request: Request) {
     const nextAttemptCount = (loginAttemptsByUsername.get(usernameKey)?.count || 0) + 1
     const remainingAttempts = Math.max(0, AUTH_LOGIN_MAX_ATTEMPTS - nextAttemptCount)
 
-    registerFailedAttempt(loginAttemptsByIp, ip, now)
-    registerFailedAttempt(loginAttemptsByUsername, usernameKey, now)
+    registerFailedAttempt(loginAttemptsByIp, ip, now, AUTH_LOGIN_MAX_ATTEMPTS_PER_IP)
+    registerFailedAttempt(loginAttemptsByUsername, usernameKey, now, AUTH_LOGIN_MAX_ATTEMPTS)
 
     const exceededLimit = remainingAttempts === 0
     if (exceededLimit) {

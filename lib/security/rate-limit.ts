@@ -1,4 +1,4 @@
-import { AUTH_LOGIN_BLOCK_WINDOW_MS, AUTH_LOGIN_MAX_ATTEMPTS } from "@/lib/auth/constants"
+import { AUTH_LOGIN_BLOCK_WINDOW_MS, AUTH_LOGIN_RATE_LIMIT_MAX_REQUESTS } from "@/lib/auth/constants"
 
 export type RateLimitBucket = "auth" | "activity" | "users" | "db" | "default"
 
@@ -16,7 +16,7 @@ const rateLimitStore = new Map<string, RateLimitRecord>()
 const MAX_RATE_LIMIT_KEYS = 20_000
 
 const RATE_LIMIT_CONFIG: Record<RateLimitBucket, RateLimitConfig> = {
-  auth: { windowMs: AUTH_LOGIN_BLOCK_WINDOW_MS, maxRequests: AUTH_LOGIN_MAX_ATTEMPTS },
+  auth: { windowMs: AUTH_LOGIN_BLOCK_WINDOW_MS, maxRequests: AUTH_LOGIN_RATE_LIMIT_MAX_REQUESTS },
   activity: { windowMs: 60_000, maxRequests: 80 },
   users: { windowMs: 60_000, maxRequests: 120 },
   db: { windowMs: 60_000, maxRequests: 40 },
