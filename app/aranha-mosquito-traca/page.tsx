@@ -135,8 +135,8 @@ IMPORTANTE: O foco dos piolhos sao os ninhos. Se estes nao forem retirados NAO R
                 <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
                   <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-2 md:p-3 border-2 border-red-200">
                     <Image
-                      src="/images/pests/aranha-mosquito-traca-illustration.jpg"
-                      alt="Aranha, Mosquito e Piolho"
+                      src="/images/pests/mosquito-illustration.jpg"
+                      alt="Mosquito"
                       width={50}
                       height={50}
                       className="rounded-lg w-10 h-10 md:w-[60px] md:h-[60px]"
