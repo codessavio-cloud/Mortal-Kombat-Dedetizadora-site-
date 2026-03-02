@@ -273,33 +273,36 @@ export async function proxy(request: NextRequest) {
   pruneSecurityState(now)
 
   if (isIpBlocked(ip, now)) {
+    let releasedBlockedIp = false
     const blockedToken = request.cookies.get(AUTH_COOKIE_NAME)
     if (blockedToken) {
       const blockedPayload = await verifyAuthToken(blockedToken.value)
       if (blockedPayload) {
         releaseBlockedIp(ip, requestId, pathname, "authenticated-session")
-        return nextResponse()
+        releasedBlockedIp = true
       }
     }
 
-    const isApiRoute = pathname.startsWith("/api/")
-    const isAuthApiRoute = pathname.startsWith("/api/auth/")
+    if (!releasedBlockedIp) {
+      const isApiRoute = pathname.startsWith("/api/")
+      const isAuthApiRoute = pathname.startsWith("/api/auth/")
 
-    if (!isApiRoute || isAuthApiRoute) {
-      releaseBlockedIp(ip, requestId, pathname, isAuthApiRoute ? "auth-api-route" : "human-navigation")
-      if (isAuthApiRoute) {
-        return nextResponse()
+      if (!isApiRoute || isAuthApiRoute) {
+        releaseBlockedIp(ip, requestId, pathname, isAuthApiRoute ? "auth-api-route" : "human-navigation")
+        if (isAuthApiRoute) {
+          return nextResponse()
+        }
+        // Continue the normal middleware auth checks for page routes.
+      } else {
+        return apiErrorResponse(
+          403,
+          "Acesso bloqueado por atividade suspeita",
+          "SUSPICIOUS_ACTIVITY_BLOCKED",
+          requestId,
+          undefined,
+          rateLimitRemaining,
+        )
       }
-      // Continue the normal middleware auth checks for page routes.
-    } else {
-      return apiErrorResponse(
-        403,
-        "Acesso bloqueado por atividade suspeita",
-        "SUSPICIOUS_ACTIVITY_BLOCKED",
-        requestId,
-        undefined,
-        rateLimitRemaining,
-      )
     }
   }
 

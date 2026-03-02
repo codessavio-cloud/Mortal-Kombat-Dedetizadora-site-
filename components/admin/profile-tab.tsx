@@ -38,7 +38,9 @@ export function ProfileTab({
           </div>
           <div>
             <h3 className="text-lg font-bold text-gray-900">{currentUser?.username}</h3>
-            <p className="text-sm text-red-600 font-medium">Proprietario / Admin</p>
+            <p className="text-sm text-red-600 font-medium">
+              {currentUser?.role === "admin" ? "Proprietario / Admin" : "Funcionario"}
+            </p>
           </div>
         </div>
       </div>

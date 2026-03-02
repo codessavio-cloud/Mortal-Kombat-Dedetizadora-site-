@@ -44,6 +44,22 @@ describe("resolvePostLoginRedirect", () => {
     expect(resolvePostLoginRedirect({ role: "admin" })).toBe("/admin")
     expect(resolvePostLoginRedirect({ role: "funcionario" })).toBe("/")
   })
+
+  it("impede funcionario de ser redirecionado para admin", () => {
+    expect(
+      resolvePostLoginRedirect({
+        role: "funcionario",
+        requestedPath: "/admin",
+      }),
+    ).toBe("/")
+
+    expect(
+      resolvePostLoginRedirect({
+        role: "funcionario",
+        apiRedirectTo: "/admin/equipe",
+      }),
+    ).toBe("/")
+  })
 })
 
 describe("toIsoFromUnixTimestamp", () => {

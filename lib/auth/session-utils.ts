@@ -25,16 +25,26 @@ export function resolvePostLoginRedirect(options: {
 }) {
   const requestedPath = sanitizeNextPath(options.requestedPath)
   const apiRedirectTo = sanitizeNextPath(options.apiRedirectTo)
+  const defaultPath = options.role === "admin" ? "/admin" : "/"
+
+  const canAccessAdmin = options.role === "admin"
+  const isAdminPath = (value: string) => value === "/admin" || value.startsWith("/admin/")
 
   if (requestedPath) {
+    if (!canAccessAdmin && isAdminPath(requestedPath)) {
+      return defaultPath
+    }
     return requestedPath
   }
 
   if (apiRedirectTo) {
+    if (!canAccessAdmin && isAdminPath(apiRedirectTo)) {
+      return defaultPath
+    }
     return apiRedirectTo
   }
 
-  return options.role === "admin" ? "/admin" : "/"
+  return defaultPath
 }
 
 export function toIsoFromUnixTimestamp(seconds: number | null | undefined) {
