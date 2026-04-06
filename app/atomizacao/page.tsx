@@ -4,36 +4,25 @@ import Link from "next/link"
 import { ArrowLeft, TreePalm, Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { trackGuidanceCopied } from "@/lib/activity/client"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
+import {
+  PRECOS_ATOMIZACAO_1_FUNCIONARIO,
+  PRECOS_ATOMIZACAO_2_FUNCIONARIOS,
+} from "@/lib/static-service-pricing"
 
 export default function AtomizacaoPage() {
   const [copied, setCopied] = useState(false)
-
-  const precos1Funcionario = [
-    { palmeiras: "1 a 3 Palmeiras", valor: "R$ 189,00", tempo: "1 hora" },
-    { palmeiras: "4 a 5 Palmeiras", valor: "R$ 273,00", tempo: "1h30" },
-    { palmeiras: "6 a 8 Palmeiras", valor: "R$ 336,00", tempo: "2 horas" },
-    { palmeiras: "9 a 12 Palmeiras", valor: "R$ 399,00", tempo: "2 horas" },
-    { palmeiras: "12 a 15 Palmeiras", valor: "R$ 472,50", tempo: "2h30" },
-  ]
-
-  const precos2Funcionarios = [
-    { palmeiras: "1 a 3 Palmeiras", valor: "R$ 273,00", tempo: "1 hora" },
-    { palmeiras: "4 a 5 Palmeiras", valor: "R$ 336,00", tempo: "1h30" },
-    { palmeiras: "6 a 8 Palmeiras", valor: "R$ 441,00", tempo: "2 horas" },
-    { palmeiras: "9 a 12 Palmeiras", valor: "R$ 567,00", tempo: "2 horas" },
-    { palmeiras: "12 a 15 Palmeiras", valor: "R$ 1.008,00", tempo: "2h30" },
-  ]
 
   const copiarTabela = () => {
     let texto = "ATOMIZAÇÃO MANDRUVA\n"
     texto += "VERIFICAR A DISPONIBILIDADE DO CARRO\n\n"
     texto += "1 FUNCIONÁRIO - PALMEIRAS ATÉ 2 METROS:\n"
-    precos1Funcionario.forEach((p) => {
-      texto += `${p.palmeiras} - ${p.valor} - ${p.tempo}\n`
+    PRECOS_ATOMIZACAO_1_FUNCIONARIO.forEach((p) => {
+      texto += `${p.label} - ${formatBRL(p.valor)} - ${p.tempo}\n`
     })
     texto += "\n2 FUNCIONÁRIOS - DE 2,5 A 7 METROS:\n"
-    precos2Funcionarios.forEach((p) => {
-      texto += `${p.palmeiras} - ${p.valor} - ${p.tempo}\n`
+    PRECOS_ATOMIZACAO_2_FUNCIONARIOS.forEach((p) => {
+      texto += `${p.label} - ${formatBRL(p.valor)} - ${p.tempo}\n`
     })
     texto += "\nDesconto: 5% à vista"
     navigator.clipboard.writeText(texto)
@@ -106,18 +95,18 @@ export default function AtomizacaoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {precos1Funcionario.map((preco, index) => (
+                  {PRECOS_ATOMIZACAO_1_FUNCIONARIO.map((preco, index) => (
                     <tr key={index}>
-                      <td className="px-3 py-2 border-b border-r bg-blue-50 font-medium text-sm">{preco.palmeiras}</td>
+                      <td className="px-3 py-2 border-b border-r bg-blue-50 font-medium text-sm">{preco.label}</td>
                       <td className="px-3 py-2 border-b border-r bg-yellow-50 text-center font-semibold text-sm">
-                        {preco.valor}
+                        {formatBRL(preco.valor)}
                       </td>
                       <td className="px-3 py-2 border-b border-r bg-yellow-50 text-center text-sm">{preco.tempo}</td>
                       <td className="px-3 py-2 border-b border-r bg-yellow-50 text-center font-semibold text-sm">
-                        {precos2Funcionarios[index].valor}
+                        {formatBRL(PRECOS_ATOMIZACAO_2_FUNCIONARIOS[index].valor)}
                       </td>
                       <td className="px-3 py-2 border-b border-r bg-yellow-50 text-center text-sm">
-                        {precos2Funcionarios[index].tempo}
+                        {PRECOS_ATOMIZACAO_2_FUNCIONARIOS[index].tempo}
                       </td>
                     </tr>
                   ))}

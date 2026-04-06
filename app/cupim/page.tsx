@@ -6,6 +6,14 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { trackGuidanceCopied } from "@/lib/activity/client"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
+import {
+  GARANTIA_CUPIM,
+  PRECO_CUPIM_SOFA,
+  PRECOS_CUPIM_GUARDA_ROUPAS,
+  PRECOS_CUPIM_PORTAS,
+  VALOR_APROXIMADO_CUPIM_SUBTERRANEO,
+} from "@/lib/static-service-pricing"
 
 export default function CupimPage() {
   const [copied, setCopied] = useState(false)
@@ -13,19 +21,21 @@ export default function CupimPage() {
   const infoTexto = `CUPIM - Tabela de Preços
 
 PORTAS:
-• Até 3 portas – 1 funcionário – 1h - R$315,00 no cartão ou R$294,00 à vista
-• 4 a 6 portas - 1 funcionário - 1h30 – R$472,50 no cartão ou R$441,00 à vista
-• 7 a 9 portas - 1 funcionário - 2h – R$619,50 no cartão ou R$588,00 à vista
+${PRECOS_CUPIM_PORTAS.map(
+  (preco) =>
+    `• ${preco.label} - 1 funcionário - ${preco.tempo} - ${formatBRL(preco.cartao)} no cartão ou ${formatBRL(preco.vista)} à vista`,
+).join("\n")}
 
 SOFÁ:
-• 1 sofá de 3 lugares e 1 de 2 lugares - R$294,00 - 1h - 1 funcionário
+• ${PRECO_CUPIM_SOFA.descricao} - ${formatBRL(PRECO_CUPIM_SOFA.valor)} - ${PRECO_CUPIM_SOFA.tempo} - ${PRECO_CUPIM_SOFA.funcionarios}
 
 GUARDA-ROUPAS:
-• 01 a 04 portas – R$315,00 no cartão ou R$294,00 à vista - 1h - 1 funcionário
-• 05 a 08 portas - R$472,50 no cartão ou R$441,00 à vista - 1h30 - 1 funcionário
-• 09 a 12 portas – R$630,00 no cartão ou R$588,00 à vista - 2h - 1 funcionário
+${PRECOS_CUPIM_GUARDA_ROUPAS.map(
+  (preco) =>
+    `• ${preco.label} - ${formatBRL(preco.cartao)} no cartão ou ${formatBRL(preco.vista)} à vista - ${preco.tempo} - 1 funcionário`,
+).join("\n")}
 
-Garantia de 3 meses
+${GARANTIA_CUPIM}
 
 CUPIM DE MADEIRA:
 Injeção pontual no móvel ou porta onde há foco de cupim. O cômodo deve ficar isolado por 24 horas.
@@ -35,7 +45,7 @@ Observação:
 2- Em alguns casos portas ou moveis estão com um grau de degradação muito grande, após feito o tratamento podem inchar muito e vir a perder o item a ponto de precisar substituir. Não nós responsabilizamos pelo reparo das peças.
 
 CUPIM SUBTERRÂNEO:
-O tratamento para descupinização de cupim de solo, é feito em volta do terreno furos com a distância de 30 cm e profundidade entre 30 a 40 cm, e injetado 1 litro de produto em cada furo, fazendo assim uma barreira química em baixo do solo. Essa descupinização fica em torno de 3 mil reais em terreno de até 250 metros.`
+O tratamento para descupinização de cupim de solo, é feito em volta do terreno furos com a distância de 30 cm e profundidade entre 30 a 40 cm, e injetado 1 litro de produto em cada furo, fazendo assim uma barreira química em baixo do solo. Essa descupinização fica em torno de ${formatBRL(VALOR_APROXIMADO_CUPIM_SUBTERRANEO)} em terreno de até 250 metros.`
 
   const copiarTexto = () => {
     navigator.clipboard.writeText(infoTexto)
@@ -87,21 +97,15 @@ O tratamento para descupinização de cupim de solo, é feito em volta do terren
                   PORTAS
                 </h2>
                 <div className="space-y-2">
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">Até 3 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 1h</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$315,00 cartão | R$294,00 à vista</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">4 a 6 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 1h30</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$472,50 cartão | R$441,00 à vista</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">7 a 9 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 2h</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$619,50 cartão | R$588,00 à vista</p>
-                  </div>
+                  {PRECOS_CUPIM_PORTAS.map((preco) => (
+                    <div key={preco.label} className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
+                      <p className="font-semibold text-gray-800 text-sm md:text-base">{preco.label}</p>
+                      <p className="text-xs md:text-sm text-gray-600">1 funcionário – {preco.tempo}</p>
+                      <p className="text-base md:text-lg font-bold text-green-600">
+                        {formatBRL(preco.cartao)} cartão | {formatBRL(preco.vista)} à vista
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -111,11 +115,13 @@ O tratamento para descupinização de cupim de solo, é feito em volta do terren
                   SOFÁ
                 </h2>
                 <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                  <p className="font-semibold text-gray-800 text-sm md:text-base">
-                    1 sofá de 3 lugares + 1 de 2 lugares
+                  <p className="font-semibold text-gray-800 text-sm md:text-base">{PRECO_CUPIM_SOFA.descricao}</p>
+                  <p className="text-xs md:text-sm text-gray-600">
+                    {PRECO_CUPIM_SOFA.funcionarios} – {PRECO_CUPIM_SOFA.tempo}
                   </p>
-                  <p className="text-xs md:text-sm text-gray-600">1 funcionário – 1h</p>
-                  <p className="text-base md:text-lg font-bold text-green-600">R$294,00</p>
+                  <p className="text-base md:text-lg font-bold text-green-600">
+                    {formatBRL(PRECO_CUPIM_SOFA.valor)}
+                  </p>
                 </div>
               </div>
 
@@ -125,27 +131,21 @@ O tratamento para descupinização de cupim de solo, é feito em volta do terren
                   GUARDA-ROUPAS
                 </h2>
                 <div className="space-y-2">
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">01 a 04 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 1h</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$315,00 cartão | R$294,00 à vista</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">05 a 08 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 1h30</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$472,50 cartão | R$441,00 à vista</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-800 text-sm md:text-base">09 a 12 portas</p>
-                    <p className="text-xs md:text-sm text-gray-600">1 funcionário – 2h</p>
-                    <p className="text-base md:text-lg font-bold text-green-600">R$630,00 cartão | R$588,00 à vista</p>
-                  </div>
+                  {PRECOS_CUPIM_GUARDA_ROUPAS.map((preco) => (
+                    <div key={preco.label} className="bg-gray-50 rounded-lg p-2 md:p-3 border border-gray-200">
+                      <p className="font-semibold text-gray-800 text-sm md:text-base">{preco.label}</p>
+                      <p className="text-xs md:text-sm text-gray-600">1 funcionário – {preco.tempo}</p>
+                      <p className="text-base md:text-lg font-bold text-green-600">
+                        {formatBRL(preco.cartao)} cartão | {formatBRL(preco.vista)} à vista
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Garantia */}
               <div className="bg-green-100 border-2 border-green-500 rounded-xl p-3 md:p-4 text-center">
-                <p className="text-lg md:text-xl font-bold text-green-700">Garantia de 3 meses</p>
+                <p className="text-lg md:text-xl font-bold text-green-700">{GARANTIA_CUPIM}</p>
               </div>
             </section>
 
@@ -172,7 +172,8 @@ O tratamento para descupinização de cupim de solo, é feito em volta do terren
                 <h3 className="font-bold mb-2 text-sm md:text-base">CUPIM SUBTERRÂNEO</h3>
                 <p className="leading-relaxed text-xs md:text-sm">
                   Furos com distância de 30 cm e profundidade de 30 a 40 cm em volta do terreno, com injeção de 1 litro
-                  de produto em cada furo. Aprox. R$ 3.150 para terreno de até 250m².
+                  de produto em cada furo. Aprox. {formatBRL(VALOR_APROXIMADO_CUPIM_SUBTERRANEO)} para terreno de até
+                  250m².
                 </p>
               </div>
 
