@@ -4,29 +4,16 @@ import Link from "next/link"
 import { ArrowLeft, Droplets, Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { trackGuidanceCopied } from "@/lib/activity/client"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
+import {
+  ANO_CAIXA_DAGUA,
+  PRECOS_CAIXA_DAGUA_COM_DEDETIZACAO,
+  PRECOS_CAIXA_DAGUA_SEM_DEDETIZACAO,
+} from "@/lib/static-service-pricing"
 
 export default function CaixaDaguaPage() {
   const [copied, setCopied] = useState(false)
   const [copiedFala, setCopiedFala] = useState(false)
-
-  const precosComDedetizacao = [
-    { litragem: "500lts até 1.500lts", cartao: "R$ 260,00", vista: "R$ 240,00" },
-    { litragem: "2.000lts até 5.000lts", cartao: "R$ 370,00", vista: "R$ 350,00" },
-    { litragem: "6.000lts até 10.000lts", cartao: "R$ 500,00", vista: "R$ 480,00" },
-    { litragem: "11.000lts até 15.000lts", cartao: "R$ 620,00", vista: "R$ 600,00" },
-    { litragem: "16.000lts até 20.000lts", cartao: "R$ 680,00", vista: "R$ 660,00" },
-    { litragem: "21.000lts até 30.000lts", cartao: "R$ 800,00", vista: "R$ 780,00" },
-    { litragem: "31.000lts até 40.000lts", cartao: "R$ 910,00", vista: "R$ 890,00" },
-    { litragem: "41.000lts até 50.000lts", cartao: "R$ 970,00", vista: "R$ 950,00" },
-  ]
-
-  const precosSemDedetizacao = [
-    { litragem: "500lts até 1.500lts", cartao: "R$ 300,00", vista: "R$ 280,00" },
-    { litragem: "2.000lts até 5.000lts", cartao: "R$ 400,00", vista: "R$ 380,00" },
-    { litragem: "6.000lts até 10.000lts", cartao: "R$ 550,00", vista: "R$ 530,00" },
-    { litragem: "11.000lts até 15.000lts", cartao: "R$ 650,00", vista: "R$ 630,00" },
-    { litragem: "16.000lts até 20.000lts", cartao: "R$ 760,00", vista: "R$ 740,00" },
-  ]
 
   const falaLimpeza = `Durante a limpeza da caixa d'água 💧, por favor, evite usar a água dela, pois isso pode causar problemas como a entrada de ar no encanamento 🔧, o que pode levar a danos ou falta de água. 🚫💦
 Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novamente.`
@@ -39,14 +26,14 @@ Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novament
   }
 
   const copiarTabela = () => {
-    let texto = "VALORES CAIXA D'ÁGUA 2025\n\n"
+    let texto = `VALORES CAIXA D'ÁGUA ${ANO_CAIXA_DAGUA}\n\n`
     texto += "COM DEDETIZAÇÃO:\n"
-    precosComDedetizacao.forEach((p) => {
-      texto += `${p.litragem} - ${p.cartao} (cartão) / ${p.vista} (vista)\n`
+    PRECOS_CAIXA_DAGUA_COM_DEDETIZACAO.forEach((p) => {
+      texto += `${p.label} - ${formatBRL(p.cartao)} (cartão) / ${formatBRL(p.vista)} (vista)\n`
     })
     texto += "\nSEM DEDETIZAÇÃO:\n"
-    precosSemDedetizacao.forEach((p) => {
-      texto += `${p.litragem} - ${p.cartao} (cartão) / ${p.vista} (vista)\n`
+    PRECOS_CAIXA_DAGUA_SEM_DEDETIZACAO.forEach((p) => {
+      texto += `${p.label} - ${formatBRL(p.cartao)} (cartão) / ${formatBRL(p.vista)} (vista)\n`
     })
     navigator.clipboard.writeText(texto)
     trackGuidanceCopied("Copiou tabela - Caixa d'agua")
@@ -97,7 +84,9 @@ Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novament
           {/* Tabela COM Dedetização */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
             <div className="bg-gray-900 text-white px-6 py-4">
-              <h2 className="text-xl font-bold text-center">Valores das caixas d'água 2025 - com dedetização</h2>
+              <h2 className="text-xl font-bold text-center">
+                Valores das caixas d'água {ANO_CAIXA_DAGUA} - com dedetização
+              </h2>
             </div>
             <table className="w-full">
               <thead className="bg-gray-100">
@@ -108,11 +97,15 @@ Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novament
                 </tr>
               </thead>
               <tbody>
-                {precosComDedetizacao.map((preco, index) => (
+                {PRECOS_CAIXA_DAGUA_COM_DEDETIZACAO.map((preco, index) => (
                   <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="px-6 py-3 border-b font-medium">{preco.litragem}</td>
-                    <td className="px-6 py-3 border-b text-center font-semibold text-blue-600">{preco.cartao}</td>
-                    <td className="px-6 py-3 border-b text-center font-semibold text-green-600">{preco.vista}</td>
+                    <td className="px-6 py-3 border-b font-medium">{preco.label}</td>
+                    <td className="px-6 py-3 border-b text-center font-semibold text-blue-600">
+                      {formatBRL(preco.cartao)}
+                    </td>
+                    <td className="px-6 py-3 border-b text-center font-semibold text-green-600">
+                      {formatBRL(preco.vista)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -125,7 +118,9 @@ Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novament
           {/* Tabela SEM Dedetização */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
             <div className="bg-gray-900 text-white px-6 py-4">
-              <h2 className="text-xl font-bold text-center">Valores das caixas d'água 2025 - sem dedetização</h2>
+              <h2 className="text-xl font-bold text-center">
+                Valores das caixas d'água {ANO_CAIXA_DAGUA} - sem dedetização
+              </h2>
             </div>
             <table className="w-full">
               <thead className="bg-gray-100">
@@ -136,11 +131,15 @@ Aguarde pelo menos 1 hora⏳ após o serviço antes de utilizar a água novament
                 </tr>
               </thead>
               <tbody>
-                {precosSemDedetizacao.map((preco, index) => (
+                {PRECOS_CAIXA_DAGUA_SEM_DEDETIZACAO.map((preco, index) => (
                   <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="px-6 py-3 border-b font-medium">{preco.litragem}</td>
-                    <td className="px-6 py-3 border-b text-center font-semibold text-blue-600">{preco.cartao}</td>
-                    <td className="px-6 py-3 border-b text-center font-semibold text-green-600">{preco.vista}</td>
+                    <td className="px-6 py-3 border-b font-medium">{preco.label}</td>
+                    <td className="px-6 py-3 border-b text-center font-semibold text-blue-600">
+                      {formatBRL(preco.cartao)}
+                    </td>
+                    <td className="px-6 py-3 border-b text-center font-semibold text-green-600">
+                      {formatBRL(preco.vista)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

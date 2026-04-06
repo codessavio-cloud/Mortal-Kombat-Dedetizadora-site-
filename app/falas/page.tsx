@@ -4,6 +4,8 @@ import Link from "next/link"
 import { ArrowLeft, MessageCircle, Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { trackGuidanceCopied } from "@/lib/activity/client"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
+import { TAXA_MINIMA_REAGENDAMENTO } from "@/lib/static-service-pricing"
 
 export default function FalasPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
@@ -56,7 +58,7 @@ Endereço:
 E-mail:
 Forma de pagamento:`
 
-  const avisoReagendamento = `🛑 Nosso atendimento é personalizado e dedicado para você cliente. Caso aconteça algum imprevisto e seja necessário um reagendamento, solicite o mesmo com 24h de antecedência. Em situações que o reagendamento seja feito com menos de 24hrs de antecedência será cobrado a taxa mínima no valor de R$52,50. 
+  const avisoReagendamento = `🛑 Nosso atendimento é personalizado e dedicado para você cliente. Caso aconteça algum imprevisto e seja necessário um reagendamento, solicite o mesmo com 24h de antecedência. Em situações que o reagendamento seja feito com menos de 24hrs de antecedência será cobrado a taxa mínima no valor de ${formatBRL(TAXA_MINIMA_REAGENDAMENTO)}. 
 🛑 Programe-se, siga o passo a passo das orientações pois controle de pragas é coisa séria!
 😉 Agradecemos por sua confiança na Mortal Kombat 😃`
 

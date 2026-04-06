@@ -4,24 +4,18 @@ import Link from "next/link"
 import { ArrowLeft, Car, Copy, Check } from "lucide-react"
 import { useState } from "react"
 import { trackGuidanceCopied } from "@/lib/activity/client"
+import { formatBRL } from "@/lib/calculators/price-adjustment"
+import { PRECOS_VEICULOS } from "@/lib/static-service-pricing"
 
 export default function VeiculosPage() {
   const [copied, setCopied] = useState(false)
 
-  const precos = [
-    { quantidade: "Se for até dois veículos", esgoto: "R$ 126,00", baratinhas: "R$ 231,00", desconto: "não tem" },
-    { quantidade: "De 3 a 5 veículos", esgoto: "R$ 115,50", baratinhas: "R$ 210,00", desconto: "" },
-    { quantidade: "De 5 a 15 veículos", esgoto: "R$ 94,50", baratinhas: "R$ 168,00", desconto: "a vista 5%" },
-    { quantidade: "De 15 a 25 veículos", esgoto: "R$ 84,00", baratinhas: "R$ 157,50", desconto: "" },
-    { quantidade: "De 25 a 40 veículos", esgoto: "R$ 63,00", baratinhas: "R$ 105,00", desconto: "" },
-  ]
-
   const copiarTabela = () => {
     let texto = "VEÍCULO - DEDETIZAÇÃO\n\n"
-    precos.forEach((p) => {
+    PRECOS_VEICULOS.forEach((p) => {
       texto += `${p.quantidade}\n`
-      texto += `  Baratas de esgoto: ${p.esgoto}\n`
-      texto += `  Baratinhas: ${p.baratinhas}\n`
+      texto += `  Baratas de esgoto: ${formatBRL(p.esgoto)}\n`
+      texto += `  Baratinhas: ${formatBRL(p.baratinhas)}\n`
       if (p.desconto) texto += `  Desconto: ${p.desconto}\n`
       texto += "\n"
     })
@@ -72,14 +66,14 @@ export default function VeiculosPage() {
                 </tr>
               </thead>
               <tbody>
-                {precos.map((preco, index) => (
+                {PRECOS_VEICULOS.map((preco, index) => (
                   <tr key={index}>
                     <td className="px-4 py-3 border-b border-r bg-blue-50 font-medium">{preco.quantidade}</td>
                     <td className="px-4 py-3 border-b border-r bg-yellow-50 text-center font-semibold">
-                      {preco.esgoto}
+                      {formatBRL(preco.esgoto)}
                     </td>
                     <td className="px-4 py-3 border-b border-r bg-yellow-50 text-center font-semibold">
-                      {preco.baratinhas}
+                      {formatBRL(preco.baratinhas)}
                     </td>
                     <td className="px-4 py-3 border-b bg-green-50 text-center font-semibold text-green-700">
                       {preco.desconto}
